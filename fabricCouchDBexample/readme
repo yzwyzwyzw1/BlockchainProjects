@@ -1,0 +1,39 @@
+#/bin/bash!
+rm -f ./fixtures/channel-artifacts/*
+rm -rf ./fixtures/crypto-config
+
+---
+cd fixtures
+cryptogen generate  --config ./crypto-config.yaml  --output  crypto-config
+export FABRIC_CFG_PATH=$PWD
+export CHANNEL_NAME=mychannel
+configtxgen  -profile TwoOrgsOrdererGenesis  -outputBlock     ./channel-artifacts/genesis.block
+configtxgen  -profile TwoOrgsChannel -outputCreateChannelTx   ./channel-artifacts/mychannel.tx      -channelID $CHANNEL_NAME
+configtxgen  -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org1MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org1MSP
+configtxgen  -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org2MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org2MSP
+
+
+
+
+
+切记：
+先修改 docker-compose-base.yaml 再启动网络
+
+---
+//其他
+peer channel list //查看通道
+peer chaincode list --instantiated -C mychannel  //查看通道中被安装的链码
+
+
+---
+//因为是单个组织，因此可以有锚节点也可以没有锚节点
+configtxgen -profile OneOrgChannel -outputAnchorPeersUpdate ./channel-artifacts/Org1MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org1MSP
+peer channel update -o orderer.example.com:7050 -c $CHANNEL_NAME -f ../channel-artifacts/Org1MSPanchors.tx --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+
+
+凡是和permission denied有关的，都是和证书与私钥相关，以及节点权限相关
+我曾经修改过configtx.yaml文件中的OrdererOrg中的&OrdererOrgPolicies导致permission denied失败。
+
+
+如果将docker-compose。yaml中的- CORE_PEER_ADDRESSAUTODETECT=true注释掉将会报如下错误：
+gRPC Transport Status Code: (4) DeadlineExceeded. Description: context deadline exceeded
